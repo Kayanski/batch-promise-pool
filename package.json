@@ -1,11 +1,8 @@
 {
-  "name": "@supercharge/promise-pool",
-  "description": "Map-like, concurrent promise processing for Node.js",
-  "version": "2.3.2",
-  "author": "Marcus Pöhls <marcus@superchargejs.com>",
-  "bugs": {
-    "url": "https://github.com/superchargejs/promise-pool/issues"
-  },
+  "name": "@kayanski/promise-pool",
+  "description": "Map-like, concurrent promise processing for Node.js. Modified to process items in actual batches",
+  "version": "3.0.0",
+  "author": "Marcus Pöhls <marcus@superchargejs.com> / Nicolas KOWALSKI (modified) <kowalski.web3@gmail.com>",
   "devDependencies": {
     "@supercharge/eslint-config-typescript": "~2.3.0",
     "@supercharge/tsconfig": "~1.0.0",
@@ -52,5 +49,8 @@
     "test:coverage": "c8 --include=dist npm run test:run && npm run test:report",
     "test:report": "c8 report --reporter=html"
   },
-  "types": "dist"
+  "types": "dist",
+  "dependencies": {
+    "@kayanski/promise-pool": "^3.0.0"
+  }
 }

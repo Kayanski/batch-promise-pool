@@ -58,4 +58,6 @@ export type ErrorHandler<T> = (error: Error, item: T, pool: Stoppable & UsesConc
 
 export type ProcessHandler<T, R> = (item: T, index: number, pool: Stoppable & UsesConcurrency) => R | Promise<R>
 
+export type ProcessBatchHandler<T, R> = (items: T[], pool: Stoppable & UsesConcurrency) => R | Promise<R>
+
 export type OnProgressCallback<T> = (item: T, pool: Stoppable & Statistics<T> & UsesConcurrency) => void

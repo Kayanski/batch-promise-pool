@@ -3,7 +3,7 @@
 import { ReturnValue } from './return-value'
 import { PromisePoolError } from './promise-pool-error'
 import { StopThePromisePoolError } from './stop-the-promise-pool-error'
-import { ErrorHandler, ProcessHandler, OnProgressCallback, Statistics, Stoppable, UsesConcurrency } from './contracts'
+import { ErrorHandler, ProcessHandler, OnProgressCallback, Statistics, Stoppable, UsesConcurrency, ProcessBatchHandler } from './contracts'
 import { ValidationError } from './validation-error'
 
 export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, Statistics<T> {
@@ -53,6 +53,11 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
   private handler: (item: T, index: number, pool: Stoppable & UsesConcurrency) => any
 
   /**
+   * The async processing function receiving all `items` from a pool.
+   */
+  private batchHandler: (items: T[], pool: Stoppable & UsesConcurrency) => any
+
+  /**
    * The async error handling function.
    */
   private errorHandler?: ErrorHandler<T>
@@ -82,6 +87,7 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
     }
 
     this.handler = () => {}
+    this.batchHandler = () => {}
     this.errorHandler = undefined
     this.onTaskStartedHandlers = []
     this.onTaskFinishedHandlers = []
@@ -241,6 +247,19 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
   }
 
   /**
+   * Set the handler that is applied to each item.
+   *
+   * @param {Function} action
+   *
+   * @returns {PromisePoolExecutor}
+   */
+  withCallBack (action: ProcessBatchHandler<T, R>): this {
+    this.batchHandler = action
+
+    return this
+  }
+
+  /**
    * Determine whether a custom error handle is available.
    *
    * @returns {Boolean}
@@ -380,16 +399,15 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
    * @returns {Promise}
    */
   async process (): Promise<ReturnValue<T, R>> {
-    for (const [index, item] of this.items().entries()) {
-      if (this.isStopped()) {
-        break
-      }
-
-      await this.waitForProcessingSlot()
-      this.startProcessing(item, index)
+    if (this.isStopped()) {
+      return await this.drained()
     }
+    await this.waitForProcessingSlot()
+
+    this.startBatchProcessing(this.items());
 
     return await this.drained()
+    
   }
 
   /**
@@ -414,22 +432,22 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
    * @param {T} item
    * @param {number} index
    */
-  startProcessing (item: T, index: number): void {
-    const task: Promise<void> = this.createTaskFor(item, index)
+  startBatchProcessing (items: T[]): void {
+    const task: Promise<void> = this.createTaskForMultiple(items)
       .then(result => {
         this.save(result).removeActive(task)
       })
       .catch(async error => {
-        await this.handleErrorFor(error, item)
+        await this.handleErrorForBatch(error, items)
         this.removeActive(task)
       })
       .finally(() => {
-        this.processedItems().push(item)
-        this.runOnTaskFinishedHandlers(item)
+        this.processedItems().push(...items)
+        this.runBatchOnTaskFinishedHandlers(items)
       })
 
     this.tasks().push(task)
-    this.runOnTaskStartedHandlers(item)
+    this.runBatchOnTaskStartedHandlers(items)
   }
 
   /**
@@ -440,8 +458,8 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
    *
    * @returns {*}
    */
-  async createTaskFor (item: T, index: number): Promise<any> {
-    return this.handler(item, index, this)
+  async createTaskForMultiple (items: T[]): Promise<any> {
+    return this.batchHandler(items, this)
   }
 
   /**
@@ -476,7 +494,7 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
    * @param {Error} error
    * @param {T} item
    */
-  async handleErrorFor (error: Error, item: T): Promise<void> {
+  async handleErrorForBatch(error: Error, _items: T[]): Promise<void> {
     if (this.isStoppingThePoolError(error)) {
       return
     }
@@ -485,10 +503,7 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
       this.markAsStopped()
       throw error
     }
-
-    this.hasErrorHandler()
-      ? await this.runErrorHandlerFor(error, item)
-      : this.saveErrorFor(error, item)
+    // No custom error handling
   }
 
   /**
@@ -537,12 +552,26 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
   }
 
   /**
+   * Run the onTaskStarted handlers.
+   */
+  runBatchOnTaskStartedHandlers (_items: T[]): void {
+    // No on batch started handlers
+  }
+
+  /**
    * Run the onTaskFinished handlers.
    */
   runOnTaskFinishedHandlers (item: T): void {
     this.onTaskFinishedHandlers.forEach(handler => {
       handler(item, this)
     })
+  }
+
+  /**
+   * Run the onTaskFinished handlers.
+   */
+  runBatchOnTaskFinishedHandlers (_items: T[]): void {
+    // No on batch finished handlers
   }
 
   /**
