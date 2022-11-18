@@ -2,7 +2,7 @@
 
 import { ReturnValue } from './return-value'
 import { PromisePoolExecutor } from './promise-pool-executor'
-import { ErrorHandler, ProcessHandler, OnProgressCallback } from './contracts'
+import { ErrorHandler, OnProgressCallback, ProcessBatchHandler } from './contracts'
 
 export class PromisePool<T> {
   /**
@@ -136,10 +136,10 @@ export class PromisePool<T> {
    *
    * @returns Promise<{ results, errors }>
    */
-  async process<ResultType, ErrorType = any> (callback: ProcessHandler<T, ResultType>): Promise<ReturnValue<T, ResultType, ErrorType>> {
+  async process<ResultType, ErrorType = any> (callback: ProcessBatchHandler<T, ResultType>): Promise<ReturnValue<T, ResultType, ErrorType>> {
     return new PromisePoolExecutor<T, ResultType>()
       .useConcurrency(this.concurrency)
-      .withHandler(callback)
+      .withBatchHandler(callback)
       .handleError(this.errorHandler)
       .onTaskStarted(this.onTaskStartedHandlers)
       .onTaskFinished(this.onTaskFinishedHandlers)

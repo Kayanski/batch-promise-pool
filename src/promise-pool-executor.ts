@@ -253,7 +253,7 @@ export class PromisePoolExecutor<T, R> implements UsesConcurrency, Stoppable, St
    *
    * @returns {PromisePoolExecutor}
    */
-  withCallBack (action: ProcessBatchHandler<T, R>): this {
+  withBatchHandler (action: ProcessBatchHandler<T, R>): this {
     this.batchHandler = action
 
     return this
